@@ -43,3 +43,27 @@ dev = [
     "ruff>=0.15.12",
     "types-redis>=4.6.0.20241004",
 ]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "N"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B", "N"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+files = ["src"]
+mypy_path = "src"
+namespace_packages = true
+explicit_package_bases = true
