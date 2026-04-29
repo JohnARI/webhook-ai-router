@@ -43,6 +43,7 @@ htmlcov/
 .coverage
 .coverage.*
 .cache
+*.pyc
 nosetests.xml
 coverage.xml
 *.cover
@@ -149,6 +150,7 @@ activemq-data/
 
 # Environments
 .env
+.env.local
 .envrc
 .venv
 env/
@@ -216,3 +218,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# MacOS
+.DS_Store
