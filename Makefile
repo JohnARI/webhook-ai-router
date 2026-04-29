@@ -1,0 +1,31 @@
+.PHONY: install run test lint fmt docker-up docker-down
+
+VENV   ?= .venv
+PY     := $(VENV)/bin/python
+PYTEST := $(VENV)/bin/pytest
+RUFF   := $(VENV)/bin/ruff
+MYPY   := $(VENV)/bin/mypy
+UV     ?= uv
+
+install:
+	$(UV) sync --frozen
+
+run:
+	$(VENV)/bin/uvicorn webhook_ai_router.main:app --reload --host 0.0.0.0 --port 8000
+
+test:
+	$(PYTEST) --cov=webhook_ai_router --cov-report=term-missing
+
+lint:
+	$(RUFF) check src tests
+	$(MYPY) src
+
+fmt:
+	$(RUFF) format src tests
+	$(RUFF) check --fix src tests
+
+docker-up:
+	docker compose up -d --build
+
+docker-down:
+	docker compose down
