@@ -7,7 +7,7 @@ orchestrator (handler reads request, calls service, returns response).
 from __future__ import annotations
 
 import json
-from typing import assert_never
+from typing import Any, assert_never
 
 from pydantic import ValidationError
 
@@ -17,6 +17,15 @@ from webhook_ai_router.schemas.webhooks import (
     WebhookEvent,
     WebhookSource,
 )
+
+
+def parsed_to_dict(event: WebhookEvent) -> dict[str, Any]:
+    """Return a JSON-serialisable dict view of a parsed webhook event.
+
+    Used by the route to hand a clean payload to the arq worker without
+    re-parsing the raw body on the worker side.
+    """
+    return event.model_dump(mode="json")
 
 
 def parse_webhook_event(source: WebhookSource, body: bytes) -> WebhookEvent:

@@ -27,8 +27,8 @@ def test_readyz_returns_503_when_redis_down() -> None:
         return False
 
     app.dependency_overrides[check_redis] = _redis_down
-    with TestClient(app) as c:
-        resp = c.get("/readyz")
+    # Lifespan-skipped TestClient (see conftest comment).
+    resp = TestClient(app).get("/readyz")
     app.dependency_overrides.clear()
 
     assert resp.status_code == 503
@@ -46,8 +46,7 @@ def test_readyz_returns_503_when_database_down() -> None:
 
     app.dependency_overrides[check_redis] = _redis_up
     app.dependency_overrides[check_database] = _db_down
-    with TestClient(app) as c:
-        resp = c.get("/readyz")
+    resp = TestClient(app).get("/readyz")
     app.dependency_overrides.clear()
 
     assert resp.status_code == 503
