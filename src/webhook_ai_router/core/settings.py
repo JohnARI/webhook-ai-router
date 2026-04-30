@@ -1,4 +1,11 @@
-"""Application settings loaded from environment / .env."""
+"""HMAC secrets settings.
+
+Cross-reference: this module owns ONLY the per-source HMAC secrets. All
+other runtime configuration (APP_ENV, REDIS_URL, DATABASE_URL, idempotency
+TTLs, LLM keys, dispatch targets) lives in :mod:`webhook_ai_router.config`.
+The split is intentional — don't merge without re-reading the discussion in
+the prior session's plan file.
+"""
 
 from __future__ import annotations
 
