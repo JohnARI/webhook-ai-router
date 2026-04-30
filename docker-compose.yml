@@ -8,6 +8,12 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       REDIS_URL: redis://redis:6379/0
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/webhook_ai_router
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-10}
+      DISPATCH_TARGETS: ${DISPATCH_TARGETS:-[]}
+      DISPATCH_TOTAL_TIMEOUT_SECONDS: ${DISPATCH_TOTAL_TIMEOUT_SECONDS:-120}
+      HUBSPOT_WEBHOOK_SECRET: ${HUBSPOT_WEBHOOK_SECRET:-}
     ports:
       - "8000:8000"
     depends_on:
@@ -25,6 +31,25 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+
+  worker:
+    build:
+      context: .
+    image: webhook-ai-router:dev
+    command: ["python", "-m", "webhook_ai_router.workers"]
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/webhook_ai_router
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-10}
+      DISPATCH_TARGETS: ${DISPATCH_TARGETS:-[]}
+      DISPATCH_TOTAL_TIMEOUT_SECONDS: ${DISPATCH_TOTAL_TIMEOUT_SECONDS:-120}
+    depends_on:
+      redis:
+        condition: service_healthy
 
   redis:
     image: redis:8.4.2-alpine

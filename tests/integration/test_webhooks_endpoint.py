@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
-from tests.conftest import HUBSPOT_TEST_SECRET
+from tests.conftest import HUBSPOT_TEST_SECRET, FakeArqPool
 
 
 def _sign(body: bytes, ts: int, secret: str = HUBSPOT_TEST_SECRET) -> str:
@@ -30,7 +30,9 @@ def _headers(body: bytes, *, idempotency_key: str | None = None) -> dict[str, st
     return headers
 
 
-def test_signed_hubspot_request_returns_202(client: TestClient) -> None:
+def test_signed_hubspot_request_returns_202_queued(
+    client: TestClient, fake_arq_pool: FakeArqPool
+) -> None:
     body = json.dumps(
         [
             {
@@ -51,9 +53,36 @@ def test_signed_hubspot_request_returns_202(client: TestClient) -> None:
 
     assert resp.status_code == 202
     payload = resp.json()
-    assert payload["status"] == "accepted"
+    assert payload["status"] == "queued"
     assert payload["event_id"]
     assert resp.headers.get("X-Request-ID")
+    # The route should have enqueued exactly one job, named correctly,
+    # using event_id as the queue-level dedup key.
+    assert len(fake_arq_pool.enqueued) == 1
+    job = fake_arq_pool.enqueued[0]
+    assert job.function == "process_webhook"
+    assert job.job_id == payload["event_id"]
+    assert job.args[0] == payload["event_id"]
+    assert job.args[1] == "hubspot"
+
+
+def test_replay_with_same_idempotency_key_does_not_re_enqueue(
+    client: TestClient, fake_arq_pool: FakeArqPool
+) -> None:
+    body = json.dumps([{"eventId": 1, "objectId": 42}]).encode("utf-8")
+    key = str(uuid4())
+
+    first = client.post(
+        "/webhooks/hubspot", content=body, headers=_headers(body, idempotency_key=key)
+    )
+    second = client.post(
+        "/webhooks/hubspot", content=body, headers=_headers(body, idempotency_key=key)
+    )
+
+    assert first.status_code == second.status_code == 202
+    # Same event_id (replay returns cached body) and exactly one enqueue.
+    assert first.json()["event_id"] == second.json()["event_id"]
+    assert len(fake_arq_pool.enqueued) == 1
 
 
 def test_invalid_signature_returns_401_problem_json(client: TestClient) -> None:
