@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "JohnARI", email = "john.aristosa@hotmail.com" }
 ]
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.18.4",
     "anthropic>=0.97.0",
@@ -51,7 +51,7 @@ addopts = "-ra --strict-markers"
 
 [tool.ruff]
 line-length = 100
-target-version = "py314"
+target-version = "py312"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
@@ -61,7 +61,7 @@ select = ["E", "F", "I", "B", "UP", "SIM", "N"]
 "tests/**" = ["B", "N"]
 
 [tool.mypy]
-python_version = "3.14"
+python_version = "3.12"
 strict = true
 files = ["src"]
 mypy_path = "src"
