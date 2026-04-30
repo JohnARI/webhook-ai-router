@@ -17,9 +17,8 @@ from typing import Any, Final
 import pytest
 from fastapi.testclient import TestClient
 
-from webhook_ai_router.config import AppEnv, LogLevel
+from webhook_ai_router.config import AppEnv, LogLevel, Settings, get_settings
 from webhook_ai_router.core.logging import configure_logging
-from webhook_ai_router.core.settings import Settings, get_settings
 from webhook_ai_router.infra.arq import get_arq_pool
 from webhook_ai_router.infra.redis import get_redis
 from webhook_ai_router.main import create_app

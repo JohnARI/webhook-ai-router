@@ -1,19 +1,16 @@
-"""Application configuration loaded from environment / .env.
-
-Cross-reference: HMAC verification reads ``hubspot_webhook_secret`` from a
-*separate* settings module — ``webhook_ai_router.core.settings``. Don't merge
-the two without thinking — see that module's docstring for context.
-"""
+"""Application configuration loaded from environment / .env."""
 
 from __future__ import annotations
 
 from enum import StrEnum
 from functools import lru_cache
+from typing import assert_never
 
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from webhook_ai_router.schemas.dispatch import DispatchTarget
+from webhook_ai_router.schemas.webhooks import WebhookSource
 
 
 class AppEnv(StrEnum):
@@ -55,6 +52,9 @@ class Settings(BaseSettings):
     idempotency_ttl_seconds: int = 86_400  # 24h, Stripe-compatible default
     idempotency_lock_ttl_seconds: int = 60
 
+    # Webhook secrets
+    hubspot_webhook_secret: SecretStr | None = None
+
     # LLM enrichment
     anthropic_api_key: SecretStr | None = None
     anthropic_model: str = "claude-sonnet-4-6"
@@ -63,6 +63,16 @@ class Settings(BaseSettings):
     # Downstream dispatch (parsed as JSON when read from env vars)
     dispatch_targets: list[DispatchTarget] = []
     dispatch_total_timeout_seconds: int = 120
+
+    def secret_for(self, source: WebhookSource) -> str:
+        """Return the shared HMAC secret for a given webhook source."""
+        match source:
+            case WebhookSource.HUBSPOT:
+                if not self.hubspot_webhook_secret:
+                    raise RuntimeError("hubspot_webhook_secret is not set")
+                return self.hubspot_webhook_secret.get_secret_value()
+            case _:  # pragma: no cover - exhaustiveness guard
+                assert_never(source)
 
 
 @lru_cache(maxsize=1)
