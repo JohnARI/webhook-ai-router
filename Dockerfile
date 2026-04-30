@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1.7
 # Multi-stage build using uv for deterministic, locked dependency installs.
 #
-# NOTE: pyproject.toml pins requires-python = ">=3.14", so the base image is
-# python:3.14-slim. (Override with `--build-arg PYTHON_VERSION=...` if you bump)
+# NOTE: pyproject.toml pins requires-python = ">=3.12", so the base image is
+# python:3.12-slim. (Override with `--build-arg PYTHON_VERSION=...` if you bump)
 
-ARG PYTHON_VERSION=3.14
+ARG PYTHON_VERSION=3.12
 
 
 FROM python:${PYTHON_VERSION}-slim AS builder
