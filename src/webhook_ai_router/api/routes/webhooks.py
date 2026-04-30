@@ -27,6 +27,7 @@ from fastapi import APIRouter, Depends, Header, Request, status
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict
 
+from webhook_ai_router.config import Settings, get_settings
 from webhook_ai_router.core.exceptions import (
     IdempotencyConflictError,
     IdempotencyKeyMissingError,
@@ -37,7 +38,6 @@ from webhook_ai_router.core.idempotency import (
     get_idempotency_store,
 )
 from webhook_ai_router.core.security import verify_hmac
-from webhook_ai_router.core.settings import Settings, get_settings
 from webhook_ai_router.infra.arq import get_arq_pool
 from webhook_ai_router.schemas.webhooks import WebhookSource
 from webhook_ai_router.services.ingest import parse_webhook_event, parsed_to_dict
