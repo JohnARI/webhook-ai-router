@@ -3,9 +3,8 @@
 * ``GET /healthz`` — always 200; the process is up.
 * ``GET /readyz`` — 200 only when Redis and Postgres respond. Otherwise 503.
 
-The Redis / Postgres health dependencies are placeholders today (always
-return ``True``); session 3 will replace them with real client pings while
-keeping the same dependency-injection seam.
+The Postgres dependency is still a placeholder (always returns ``True``);
+the database client is wired up in a later session. Redis is real.
 """
 
 from __future__ import annotations
@@ -15,6 +14,9 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
+from redis.exceptions import RedisError
+
+from webhook_ai_router.infra.redis import RedisClient, get_redis
 
 router = APIRouter(tags=["health"])
 
@@ -33,18 +35,19 @@ class ReadinessResponse(BaseModel):
     database: bool
 
 
-async def check_redis() -> bool:
-    """Placeholder Redis health check.
-
-    Replaced in session 3 by an actual ``redis.asyncio.Redis.ping()`` call.
-    """
-    return True
+async def check_redis(redis: Annotated[RedisClient, Depends(get_redis)]) -> bool:
+    """Ping Redis and return whether it answered."""
+    try:
+        return bool(await redis.ping())
+    except (RedisError, OSError):
+        return False
 
 
 async def check_database() -> bool:
     """Placeholder Postgres health check.
 
-    Replaced in session 3 by an actual ``SELECT 1`` against the async engine.
+    Replaced in a later session by an actual ``SELECT 1`` against the
+    async engine.
     """
     return True
 
