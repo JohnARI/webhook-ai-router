@@ -26,10 +26,11 @@ def configure_logging(app_env: AppEnv, log_level: LogLevel) -> None:
 
     level = logging.getLevelNamesMapping()[log_level.value]
 
+    # NOTE: ``structlog.stdlib.add_logger_name`` is intentionally absent. We
+    # use ``PrintLoggerFactory`` (no stdlib logger), which has no ``.name``.
     shared_processors: list[Processor] = [
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_log_level,
-        structlog.stdlib.add_logger_name,
         structlog.processors.TimeStamper(fmt="iso", utc=True),
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,

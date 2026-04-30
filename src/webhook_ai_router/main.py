@@ -14,6 +14,7 @@ from webhook_ai_router.api.routes import health, webhooks
 from webhook_ai_router.config import get_settings
 from webhook_ai_router.core.exceptions import WebhookError
 from webhook_ai_router.core.logging import configure_logging
+from webhook_ai_router.infra.redis import create_redis_client
 from webhook_ai_router.schemas.errors import ProblemDetail
 
 PROBLEM_CONTENT_TYPE: Final = "application/problem+json"
@@ -24,7 +25,12 @@ ERROR_TYPE_BASE: Final = "https://errors.webhook-ai-router/"
 async def _lifespan(app: FastAPI) -> AsyncGenerator[None]:
     settings = get_settings()
     configure_logging(settings.app_env, settings.log_level)
-    yield
+    redis = create_redis_client(settings.redis_url)
+    app.state.redis = redis
+    try:
+        yield
+    finally:
+        await redis.aclose()  # type: ignore[attr-defined]
 
 
 def _problem_response(request: Request, exc: WebhookError) -> JSONResponse:
