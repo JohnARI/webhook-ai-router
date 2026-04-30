@@ -6,6 +6,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Final
 
+import structlog
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
@@ -14,6 +15,7 @@ from webhook_ai_router.api.routes import health, webhooks
 from webhook_ai_router.config import get_settings
 from webhook_ai_router.core.exceptions import WebhookError
 from webhook_ai_router.core.logging import configure_logging
+from webhook_ai_router.infra.arq import create_arq_pool
 from webhook_ai_router.infra.redis import create_redis_client
 from webhook_ai_router.schemas.errors import ProblemDetail
 
@@ -25,12 +27,25 @@ ERROR_TYPE_BASE: Final = "https://errors.webhook-ai-router/"
 async def _lifespan(app: FastAPI) -> AsyncGenerator[None]:
     settings = get_settings()
     configure_logging(settings.app_env, settings.log_level)
+
     redis = create_redis_client(settings.redis_url)
+    arq_pool = await create_arq_pool(settings.redis_url)
     app.state.redis = redis
+    app.state.arq_pool = arq_pool
+
+    log = structlog.get_logger(__name__)
     try:
         yield
     finally:
-        await redis.aclose()  # type: ignore[attr-defined]
+        # Close each independently so a failure on one doesn't leak the other.
+        try:
+            await arq_pool.aclose()  # type: ignore[attr-defined]
+        except Exception:  # noqa: BLE001 - log + continue, must close redis too
+            log.exception("lifespan.arq_close_failed")
+        try:
+            await redis.aclose()  # type: ignore[attr-defined]
+        except Exception:  # noqa: BLE001
+            log.exception("lifespan.redis_close_failed")
 
 
 def _problem_response(request: Request, exc: WebhookError) -> JSONResponse:
