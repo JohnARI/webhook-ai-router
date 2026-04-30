@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/webhook_ai_router"
 
+    # Idempotency
+    idempotency_ttl_seconds: int = 86_400  # 24h, Stripe-compatible default
+    idempotency_lock_ttl_seconds: int = 60
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

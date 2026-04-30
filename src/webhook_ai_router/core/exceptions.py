@@ -35,3 +35,13 @@ class TimestampExpiredError(WebhookError):
 class PayloadInvalidError(WebhookError):
     status_code = HTTPStatus.UNPROCESSABLE_ENTITY
     title = "Invalid webhook payload"
+
+
+class IdempotencyKeyMissingError(WebhookError):
+    status_code = HTTPStatus.BAD_REQUEST
+    title = "Idempotency-Key header is required"
+
+
+class IdempotencyConflictError(WebhookError):
+    status_code = HTTPStatus.CONFLICT
+    title = "Concurrent request with same Idempotency-Key in flight"
