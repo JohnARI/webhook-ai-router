@@ -39,7 +39,7 @@ async def check_redis(redis: Annotated[RedisClient, Depends(get_redis)]) -> bool
     """Ping Redis and return whether it answered."""
     try:
         return bool(await redis.ping())
-    except RedisError, OSError:
+    except (RedisError, OSError):
         return False
 
 
