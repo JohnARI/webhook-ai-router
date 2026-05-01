@@ -131,7 +131,7 @@ class AnthropicLLMClient:
             model=self._model,
             max_tokens=self._max_tokens,
             system=_SYSTEM_PROMPT,
-            tools=[_TOOL_DEFINITION], # pyright: ignore[reportArgumentType]
+            tools=[_TOOL_DEFINITION],  # pyright: ignore[reportArgumentType]
             tool_choice={
                 "type": "tool",
                 "name": _TOOL_NAME,

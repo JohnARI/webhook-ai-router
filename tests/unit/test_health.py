@@ -26,7 +26,11 @@ def test_readyz_returns_503_when_redis_down() -> None:
     async def _redis_down() -> bool:
         return False
 
+    async def _db_up() -> bool:
+        return True
+
     app.dependency_overrides[check_redis] = _redis_down
+    app.dependency_overrides[check_database] = _db_up
     # Lifespan-skipped TestClient (see conftest comment).
     resp = TestClient(app).get("/readyz")
     app.dependency_overrides.clear()
