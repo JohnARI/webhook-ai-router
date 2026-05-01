@@ -2,9 +2,6 @@
 
 * ``GET /healthz`` — always 200; the process is up.
 * ``GET /readyz`` — 200 only when Redis and Postgres respond. Otherwise 503.
-
-The Postgres dependency is still a placeholder (always returns ``True``);
-the database client is wired up in a later session. Redis is real.
 """
 
 from __future__ import annotations
@@ -15,7 +12,11 @@ from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 from redis.exceptions import RedisError
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from webhook_ai_router.db.session import get_db_session
 from webhook_ai_router.infra.redis import RedisClient, get_redis
 
 router = APIRouter(tags=["health"])
@@ -43,13 +44,15 @@ async def check_redis(redis: Annotated[RedisClient, Depends(get_redis)]) -> bool
         return False
 
 
-async def check_database() -> bool:
-    """Placeholder Postgres health check.
-
-    Replaced in a later session by an actual ``SELECT 1`` against the
-    async engine.
-    """
-    return True
+async def check_database(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> bool:
+    """Run ``SELECT 1`` against Postgres and return whether it answered."""
+    try:
+        await session.execute(text("SELECT 1"))
+        return True
+    except (SQLAlchemyError, OSError):
+        return False
 
 
 @router.get(
