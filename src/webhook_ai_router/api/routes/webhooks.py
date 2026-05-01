@@ -1,4 +1,4 @@
-"""``POST /webhooks/{source}`` — verify, parse, enqueue, with idempotency.
+"""``POST /webhooks/{source}`` — verify, parse, persist, enqueue.
 
 Request flow:
 
@@ -7,19 +7,18 @@ Request flow:
 3. Try to acquire a Redis lock on the key. If held, 409.
 4. Re-check the cache under the lock to absorb the race where another
    request finished between our miss and our lock acquisition.
-5. Verify HMAC, parse payload, mint event_id, **enqueue arq job**, build
-   the 202 response.
+5. Verify HMAC, parse payload, **insert WebhookEvent (status=received)**,
+   **enqueue arq job**, build the 202 response.
 6. Cache the success response, then release the lock and return.
 
-On signature/payload errors we release the lock without caching, so a
-correctly-signed retry with the same key can still succeed. If enqueue
-itself fails, we also do not cache — the caller can retry safely.
+The DB unique constraint on ``idempotency_key`` is defense-in-depth — if
+two requests squeeze past Redis, the second one's INSERT fails with
+:class:`DuplicateIdempotencyKey` and we surface it as a 409 conflict.
 """
 
 from __future__ import annotations
 
 from typing import Annotated, Literal
-from uuid import uuid4
 
 import structlog
 from arq.connections import ArqRedis
@@ -40,6 +39,11 @@ from webhook_ai_router.core.idempotency import (
 from webhook_ai_router.core.security import verify_hmac
 from webhook_ai_router.infra.arq import get_arq_pool
 from webhook_ai_router.schemas.webhooks import WebhookSource
+from webhook_ai_router.services.events import (
+    DuplicateIdempotencyKey,
+    EventRepository,
+    get_event_repository,
+)
 from webhook_ai_router.services.ingest import parse_webhook_event, parsed_to_dict
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
@@ -78,6 +82,7 @@ async def receive_webhook(
     settings: Annotated[Settings, Depends(get_settings)],
     idempotency: Annotated[IdempotencyStore, Depends(get_idempotency_store)],
     arq_pool: Annotated[ArqRedis, Depends(get_arq_pool)],
+    events: Annotated[EventRepository, Depends(get_event_repository)],
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> Response:
     if not idempotency_key:
@@ -102,16 +107,29 @@ async def receive_webhook(
         verify_hmac(secret, body, x_signature, x_timestamp)
 
         event = parse_webhook_event(source, body)
-        event_id = str(uuid4())
+        payload_dict = parsed_to_dict(event)
+
+        # Persist BEFORE enqueue so the worker can find the row, and the DB
+        # unique constraint catches anything that beat Redis.
+        try:
+            event_uuid = await events.create_received(
+                source=source.value,
+                idempotency_key=idempotency_key,
+                payload=payload_dict,
+            )
+        except DuplicateIdempotencyKey as exc:
+            raise IdempotencyConflictError(str(exc)) from exc
+
+        event_id = str(event_uuid)
 
         # Enqueue OUTSIDE the cache write — if this raises, don't cache, so
         # a retry can re-enqueue. _job_id=event_id gives queue-level dedup
-        # alongside the idempotency cache.
+        # alongside the idempotency cache and DB unique constraint.
         await arq_pool.enqueue_job(
             "process_webhook",
             event_id,
             source.value,
-            parsed_to_dict(event),
+            payload_dict,
             idempotency_key,
             _job_id=event_id,
             _queue_name="arq:queue",
