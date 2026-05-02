@@ -29,6 +29,7 @@ from tenacity import (
     wait_random_exponential,
 )
 
+from webhook_ai_router.core.metrics import DISPATCH_ATTEMPTS_TOTAL, host_from_url
 from webhook_ai_router.schemas.dispatch import DispatchResult, DispatchTarget
 
 log = structlog.get_logger(__name__)
@@ -95,6 +96,7 @@ async def _send_one_with_retry(
     :class:`DispatchResult`. Never raises.
     """
     url = str(target.url)
+    host = host_from_url(url)
     attempts = 0
     last_status: int | None = None
 
@@ -110,18 +112,25 @@ async def _send_one_with_retry(
         ):
             with attempt:
                 attempts += 1
-                response = await client.request(
-                    target.method,
-                    url,
-                    json=payload,
-                    headers=target.headers or None,
-                )
+                try:
+                    response = await client.request(
+                        target.method,
+                        url,
+                        json=payload,
+                        headers=target.headers or None,
+                    )
+                except httpx.TransportError:
+                    DISPATCH_ATTEMPTS_TOTAL.labels(target=host, outcome="transport_error").inc()
+                    raise
                 last_status = response.status_code
                 if 500 <= response.status_code < 600:
+                    DISPATCH_ATTEMPTS_TOTAL.labels(target=host, outcome="5xx").inc()
                     raise TransientHTTPError(response.status_code)
+                outcome = "success" if 200 <= response.status_code < 300 else "4xx"
+                DISPATCH_ATTEMPTS_TOTAL.labels(target=host, outcome=outcome).inc()
                 return DispatchResult(
                     url=url,
-                    success=200 <= response.status_code < 300,
+                    success=outcome == "success",
                     status_code=response.status_code,
                     attempts=attempts,
                 )
@@ -132,7 +141,7 @@ async def _send_one_with_retry(
             attempts=attempts,
             last_status=last_status,
         )
-        # TODO(session-5): persist failed dispatches to a DLQ table.
+        DISPATCH_ATTEMPTS_TOTAL.labels(target=host, outcome="timeout_exceeded").inc()
         return DispatchResult(
             url=url,
             success=False,
@@ -142,7 +151,7 @@ async def _send_one_with_retry(
         )
     except httpx.TransportError as exc:
         # Reraise cases that escape the retry loop directly (shouldn't
-        # happen with reraise=True+retry_if covering, but defensive).
+        # happen with retry_if covering, but defensive).
         return DispatchResult(
             url=url,
             success=False,
