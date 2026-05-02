@@ -13,8 +13,12 @@ from webhook_ai_router.workers.tasks import WorkerSettings
 
 
 def main() -> None:
-    # WorkerSettings structurally satisfies arq's WorkerSettingsBase Protocol;
-    # mypy doesn't infer that because we don't subclass it.
+    # ``WorkerSettings`` structurally satisfies arq's ``WorkerSettingsBase``
+    # Protocol — it has functions/redis_settings/on_startup/on_shutdown — but
+    # mypy can't infer the structural match because we don't explicitly
+    # subclass the Protocol (it lives in arq.typing and is intended as a
+    # runtime-only marker). Drop the ignore once arq exposes a non-Protocol
+    # base class to inherit from.
     run_worker(WorkerSettings)  # type: ignore[arg-type]
 
 

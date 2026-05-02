@@ -36,6 +36,7 @@ from webhook_ai_router.core.idempotency import (
     IdempotencyStore,
     get_idempotency_store,
 )
+from webhook_ai_router.core.metrics import WEBHOOK_RECEIVED_TOTAL
 from webhook_ai_router.core.security import verify_hmac
 from webhook_ai_router.infra.arq import get_arq_pool
 from webhook_ai_router.schemas.webhooks import WebhookSource
@@ -90,6 +91,7 @@ async def receive_webhook(
 
     cached = await idempotency.get(idempotency_key)
     if cached is not None:
+        WEBHOOK_RECEIVED_TOTAL.labels(source=source.value, status="cached").inc()
         return _response_from_cache(cached)
 
     if not await idempotency.lock(idempotency_key):
@@ -100,6 +102,7 @@ async def receive_webhook(
         # finished while we were racing for it.
         cached = await idempotency.get(idempotency_key)
         if cached is not None:
+            WEBHOOK_RECEIVED_TOTAL.labels(source=source.value, status="cached").inc()
             return _response_from_cache(cached)
 
         body = await request.body()
@@ -151,6 +154,7 @@ async def receive_webhook(
         )
         await idempotency.set(idempotency_key, cached_resp)
 
+        WEBHOOK_RECEIVED_TOTAL.labels(source=source.value, status="accepted").inc()
         return Response(
             content=accepted_body,
             status_code=status.HTTP_202_ACCEPTED,

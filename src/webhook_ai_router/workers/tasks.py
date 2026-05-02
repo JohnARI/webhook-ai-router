@@ -33,6 +33,10 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
 from webhook_ai_router.config import Settings, get_settings
 from webhook_ai_router.core.logging import configure_logging
+from webhook_ai_router.core.metrics import (
+    DLQ_EVENTS_TOTAL,
+    WEBHOOK_PROCESSING_SECONDS,
+)
 from webhook_ai_router.db.session import create_db_engine, create_db_sessionmaker
 from webhook_ai_router.infra.arq import redis_settings_from_url
 from webhook_ai_router.services.dispatch import dispatch
@@ -72,6 +76,37 @@ async def process_webhook(
 
     event_uuid = uuid.UUID(event_id)
 
+    with WEBHOOK_PROCESSING_SECONDS.labels(source=source).time():
+        return await _do_process(
+            event_uuid=event_uuid,
+            event_id=event_id,
+            source=source,
+            payload=payload,
+            idempotency_key=idempotency_key,
+            llm=llm,
+            http=http,
+            settings=settings,
+            events_factory=events_factory,
+            job_try=job_try,
+        )
+
+
+async def _do_process(
+    *,
+    event_uuid: uuid.UUID,
+    event_id: str,
+    source: str,
+    payload: dict[str, Any],
+    idempotency_key: str | None,
+    llm: LLMClient,
+    http: httpx.AsyncClient,
+    settings: Settings,
+    events_factory: EventsFactory,
+    job_try: int,
+) -> dict[str, Any]:
+    """Body of :func:`process_webhook`; split out so the histogram timer
+    cleanly wraps the whole pipeline.
+    """
     async with events_factory() as events:
         await events.mark_processing(event_uuid)
 
@@ -189,6 +224,7 @@ async def _handle_failure(
             final_error=error,
             retry_count=job_try,
         )
+        DLQ_EVENTS_TOTAL.labels(source=source).inc()
         log.error(
             "task.dlq",
             event_id=str(event_uuid),
