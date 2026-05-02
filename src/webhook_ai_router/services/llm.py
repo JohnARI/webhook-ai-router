@@ -125,8 +125,12 @@ class AnthropicLLMClient:
     async def classify_lead(self, payload: dict[str, Any]) -> EnrichmentResult:
         # Render order is tools -> system -> messages, so caching the last
         # cacheable block on the system covers BOTH tools + system.
-        # The SDK's typed overloads are tighter than the dict-shaped tool /
-        # tool_choice / messages we pass — silence with one ignore at the call.
+        # The Anthropic SDK's typed overloads expect concrete TypedDicts
+        # (``ToolParam``, ``ToolChoiceToolParam``, ``MessageParam``); we pass
+        # plain dicts shaped to the same wire format. Replacing the dicts
+        # with the SDK's TypedDicts would buy nothing at runtime — both end
+        # up as the same JSON — so we keep them readable here and silence
+        # the overload check at the call site.
         response = await self._client.messages.create(  # type: ignore[call-overload]
             model=self._model,
             max_tokens=self._max_tokens,
