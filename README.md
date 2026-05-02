@@ -1,6 +1,7 @@
 # webhook-ai-router
 
-![Coverage](https://img.shields.io/badge/coverage-87%25-brightgreen)
+[![CI](https://github.com/JohnARI/webhook-ai-router/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/JohnARI/webhook-ai-router/actions/workflows/ci.yml)
+![Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.12-blue)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 

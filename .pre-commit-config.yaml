@@ -1,0 +1,36 @@
+# Hooks run on every commit.
+# Install once after `make install` with: `uv run pre-commit install`.
+#
+# `mypy` is a local hook that delegates to `uv run` so it shares the project's
+# pinned dependency set instead of the upstream mirror's pinned env (the
+# mirror is a known footgun when the project relies on Pydantic / SQLAlchemy
+# plugins, which both ship type information out-of-tree).
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+        args: ["--maxkb=512"]
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.12
+    hooks:
+      - id: ruff-check
+        args: ["--fix", "--exit-non-zero-on-fix"]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy --strict (src/)
+        entry: uv run mypy src
+        language: system
+        types: [python]
+        pass_filenames: false
+        require_serial: true
