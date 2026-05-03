@@ -10,6 +10,7 @@ UV      ?= uv
 
 install:
 	$(UV) sync --frozen
+	@if [ -d .git ]; then $(VENV)/bin/pre-commit install; else echo "(skipping pre-commit install — not a git checkout)"; fi
 
 run:
 	$(VENV)/bin/uvicorn webhook_ai_router.main:app --reload --host 0.0.0.0 --port 8000

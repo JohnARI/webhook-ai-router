@@ -1,0 +1,77 @@
+{
+  "name": "webhook-ai-router — signed webhook example",
+  "nodes": [
+    {
+      "id": "f76b6c2c-0001-4d1e-9b3b-000000000001",
+      "name": "When clicking 'Test workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 320],
+      "parameters": {}
+    },
+    {
+      "id": "f76b6c2c-0002-4d1e-9b3b-000000000002",
+      "name": "Build signed request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 320],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Build a signed POST body for webhook-ai-router.\n//\n// Signature shape mirrors core/security.py:verify_hmac —\n// HMAC-SHA256 of \"{timestamp}.{raw_body}\" using the shared secret.\n// The same raw body bytes that get signed are the ones POSTed.\n//\n// Configure with the n8n credentials store or, for a quick demo, edit\n// the SECRET / TARGET_URL constants below.\n\nconst crypto = require('crypto');\n\nconst SECRET = process.env.HUBSPOT_WEBHOOK_SECRET || 'ci-test-secret';\nconst TARGET_URL = process.env.WEBHOOK_ROUTER_URL || 'http://localhost:8000/webhooks/hubspot';\n\nconst body = JSON.stringify([\n  {\n    eventId: Math.floor(Math.random() * 1_000_000),\n    subscriptionType: 'contact.creation',\n    portalId: 12345,\n    objectId: 999,\n    occurredAt: Date.now(),\n  },\n]);\n\nconst timestamp = Math.floor(Date.now() / 1000).toString();\nconst signature = crypto\n  .createHmac('sha256', SECRET)\n  .update(`${timestamp}.${body}`)\n  .digest('hex');\nconst idempotencyKey = crypto.randomUUID();\n\nreturn [\n  {\n    json: {\n      target_url: TARGET_URL,\n      body,\n      timestamp,\n      signature,\n      idempotency_key: idempotencyKey,\n    },\n  },\n];\n"
+      }
+    },
+    {
+      "id": "f76b6c2c-0003-4d1e-9b3b-000000000003",
+      "name": "POST /webhooks/hubspot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [760, 320],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.target_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Signature", "value": "={{ $json.signature }}" },
+            { "name": "X-Timestamp", "value": "={{ $json.timestamp }}" },
+            { "name": "Idempotency-Key", "value": "={{ $json.idempotency_key }}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When clicking 'Test workflow'": {
+      "main": [
+        [{ "node": "Build signed request", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build signed request": {
+      "main": [
+        [{ "node": "POST /webhooks/hubspot", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "00000000-0000-0000-0000-000000000001",
+  "id": "webhook-ai-router-example",
+  "meta": {
+    "instanceId": "webhook-ai-router-example"
+  }
+}
