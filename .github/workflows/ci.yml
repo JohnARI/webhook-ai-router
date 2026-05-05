@@ -47,6 +47,10 @@ jobs:
       REDIS_URL: redis://localhost:6379/0
       HUBSPOT_WEBHOOK_SECRET: ci-test-secret
       TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/webhook_ai_router
+      # The factory-level missing-key guard runs only at worker boot, never
+      # in tests — so we don't need a Gemini key in CI. Fixing the default
+      # provider here is just belt-and-braces.
+      LLM_PROVIDER: anthropic
 
     steps:
       - uses: actions/checkout@v6
