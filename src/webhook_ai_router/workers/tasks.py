@@ -42,9 +42,9 @@ from webhook_ai_router.infra.arq import redis_settings_from_url
 from webhook_ai_router.services.dispatch import dispatch
 from webhook_ai_router.services.events import EventRepository
 from webhook_ai_router.services.llm import (
-    AnthropicLLMClient,
     LLMClassificationError,
     LLMClient,
+    create_llm_client,
 )
 
 # A factory that yields a per-job EventRepository wrapping a fresh session.
@@ -259,29 +259,38 @@ def make_sessionmaker_events_factory(
     return _factory
 
 
+def _active_model(settings: Settings) -> str:
+    """Return the model name for the configured provider, for logging."""
+    from webhook_ai_router.config import LLMProvider
+
+    if settings.llm_provider is LLMProvider.ANTHROPIC:
+        return settings.anthropic_model
+    if settings.llm_provider is LLMProvider.GEMINI:
+        return settings.gemini_model
+    return str(settings.llm_provider)  # pragma: no cover
+
+
 async def _on_startup(ctx: dict[str, Any]) -> None:
     settings = get_settings()
     configure_logging(settings.app_env, settings.log_level)
 
-    if settings.anthropic_api_key is None:
-        raise RuntimeError("ANTHROPIC_API_KEY is required to run the worker — set it in .env")
-
+    # Provider selection + missing-key guard live entirely in the factory.
     db_engine: AsyncEngine = create_db_engine(settings.database_url)
     sessionmaker = create_db_sessionmaker(db_engine)
 
     ctx["settings"] = settings
-    ctx["llm"] = AnthropicLLMClient(
-        api_key=settings.anthropic_api_key.get_secret_value(),
-        model=settings.anthropic_model,
-        timeout_seconds=settings.llm_timeout_seconds,
-    )
+    ctx["llm"] = create_llm_client(settings)
     ctx["http"] = httpx.AsyncClient(
         timeout=httpx.Timeout(30.0, connect=5.0),
         follow_redirects=False,
     )
     ctx["db_engine"] = db_engine
     ctx["events_factory"] = make_sessionmaker_events_factory(sessionmaker)
-    log.info("worker.startup", model=settings.anthropic_model)
+    log.info(
+        "worker.startup",
+        provider=settings.llm_provider.value,
+        model=_active_model(settings),
+    )
 
 
 async def _on_shutdown(ctx: dict[str, Any]) -> None:

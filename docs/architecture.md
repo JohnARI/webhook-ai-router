@@ -1,6 +1,6 @@
 # Architecture decisions
 
-Five load-bearing decisions, one paragraph each. Each links to the code
+Six load-bearing decisions, one paragraph each. Each links to the code
 that enacts it. Read this before changing any of them — every choice
 trades something and has been picked deliberately.
 
@@ -26,9 +26,9 @@ for outbound dispatch, `redis.asyncio` for the idempotency cache, async
 SQLAlchemy with `asyncpg`, and arq for the worker queue. We never mix
 sync and async sessions or sync HTTP libraries; doing so reliably
 deadlocks under load (event-loop blocking via a sync `requests` call
-while an async task awaits I/O on the same loop). The cost is a
-slightly heavier toolbox (no `requests`, no `psycopg` sync driver) and
-the discipline of `# Async or nothing` enforced in
+while an async task awaits I/O on the same loop). The cost is a slightly
+heavier toolbox (no `requests`, no `psycopg` sync driver) and the
+discipline of *async or nothing* enforced in
 [CLAUDE.md](../CLAUDE.md). The benefit is one mental model: every I/O is
 awaited, every collaborator is an async client, and concurrent fan-out
 to N dispatch targets is `asyncio.gather` instead of a thread pool.
@@ -74,8 +74,29 @@ This is deliberate: arq's job result has a 1-hour TTL by default and is
 keyed by job ID — fine for ops but useless three days later when someone
 wants to know *which webhooks didn't make it*. The DLQ row carries the
 original `WebhookEvent.id` as a foreign key, the final error string, and
-the retry count, so reconciliation is a single `SELECT … JOIN
-webhook_events`. Replay is an out-of-band script (not yet built —
-flagged as a TODO in [tasks.py](../src/webhook_ai_router/workers/tasks.py))
-that re-enqueues by event_id; the queue-level dedup on
-`_job_id=event_id` keeps replays from double-dispatching.
+the retry count, so reconciliation is a single
+`SELECT … JOIN webhook_events`. Replay is an out-of-band script (not yet
+built — flagged as a TODO in
+[tasks.py](../src/webhook_ai_router/workers/tasks.py)) that re-enqueues
+by event_id; the queue-level dedup on `_job_id=event_id` keeps replays
+from double-dispatching.
+
+## 6. LLMClient Protocol + provider factory, not a base class
+
+The worker depends on a typing `Protocol`
+([`services/llm.py:LLMClient`](../src/webhook_ai_router/services/llm.py)) —
+not an abstract base class — so the test `FakeLLMClient` is structural:
+no inheritance, no metaclass, just a class with the right methods.
+`AnthropicLLMClient` and `GeminiLLMClient` both satisfy it, and a single
+`create_llm_client(settings)` factory at the bottom of the same module
+picks one based on `LLM_PROVIDER` and raises `RuntimeError` if the
+chosen provider's key is missing. We deliberately picked each provider's
+strongest structured-output path: Anthropic gets forced *tool-use* (a
+single `record_classification` tool with `tool_choice` = `tool`), Gemini
+gets `response_schema=EnrichmentResult` (the SDK auto-converts our
+Pydantic model). Both produce the same `EnrichmentResult`, so the
+contract the worker sees is identical. The missing-key guard lives in
+the factory rather than in a Pydantic `model_validator` on `Settings`
+because tests build `Settings(...)` without LLM keys all the time —
+making the validator strict would break those test paths for no
+production benefit.

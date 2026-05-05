@@ -38,11 +38,24 @@ No-code automation tools (n8n, Make) are excellent for orchestration but become 
 ```bash
 git clone https://github.com/JohnARI/webhook-ai-router.git
 cd webhook-ai-router
-cp .env.example .env  # fill in ANTHROPIC_API_KEY and HUBSPOT_WEBHOOK_SECRET
+cp .env.example .env   # fill in HUBSPOT_WEBHOOK_SECRET + your LLM provider key (see below)
 docker compose up
 ```
 
 Service is up on `http://localhost:8000`. API docs at `/docs`.
+
+### Pick an LLM provider
+
+The worker picks its classifier from `LLM_PROVIDER`. Only the active
+provider's key needs to be set:
+
+| Provider  | `LLM_PROVIDER` value   | Default model       | API key var         |
+| --------- | ---------------------- | ------------------- | ------------------- |
+| Anthropic | `anthropic` (default)  | `claude-sonnet-4-6` | `ANTHROPIC_API_KEY` |
+| Gemini    | `gemini`               | `gemini-2.5-flash`  | `GEMINI_API_KEY`    |
+
+Gemini Flash is cheaper/faster — that's the reason to pick it. For
+parity-on-quality with Sonnet 4.6 set `GEMINI_MODEL=gemini-2.5-pro`.
 
 ### Send a test webhook
 
