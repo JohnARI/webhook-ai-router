@@ -1,7 +1,7 @@
 [project]
 name = "webhook-ai-router"
-version = "0.1.0"
-description = "Add your description here"
+version = "1.0.0"
+description = "Ingestion service for incoming webhooks. Authenticates, deduplicates, enriches via LLM, and dispatches downstream — with idempotency, retries, and a dead-letter queue."
 readme = "README.md"
 authors = [
     { name = "JohnARI", email = "john.aristosa@hotmail.com" }
