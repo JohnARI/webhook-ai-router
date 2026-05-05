@@ -46,6 +46,7 @@ from webhook_ai_router.services.events import (
     get_event_repository,
 )
 from webhook_ai_router.services.ingest import parse_webhook_event, parsed_to_dict
+from webhook_ai_router.workers.tasks import QUEUE_NAME
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 log = structlog.get_logger(__name__)
@@ -135,7 +136,7 @@ async def receive_webhook(
             payload_dict,
             idempotency_key,
             _job_id=event_id,
-            _queue_name="arq:queue",
+            _queue_name=QUEUE_NAME,
         )
 
         log.info(
