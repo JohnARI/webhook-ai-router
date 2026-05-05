@@ -26,6 +26,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Install the project.
 COPY src ./src
+COPY alembic ./alembic
+COPY alembic.ini ./
 COPY README.md LICENSE ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
