@@ -63,7 +63,6 @@ def upgrade() -> None:
         "ix_webhook_events_idempotency_key",
         "webhook_events",
         ["idempotency_key"],
-        unique=True,
     )
     op.create_index("ix_webhook_events_status", "webhook_events", ["status"])
 
