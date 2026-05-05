@@ -23,9 +23,7 @@ _EVENT_STATUSES = ("received", "processing", "dispatched", "failed")
 
 
 def upgrade() -> None:
-    event_status = postgresql.ENUM(
-        *_EVENT_STATUSES, name="event_status", create_type=True
-    )
+    event_status = postgresql.ENUM(*_EVENT_STATUSES, name="event_status", create_type=True)
     event_status.create(op.get_bind(), checkfirst=True)
 
     op.create_table(
@@ -46,9 +44,7 @@ def upgrade() -> None:
         ),
         sa.Column(
             "status",
-            postgresql.ENUM(
-                *_EVENT_STATUSES, name="event_status", create_type=False
-            ),
+            postgresql.ENUM(*_EVENT_STATUSES, name="event_status", create_type=False),
             nullable=False,
             server_default="received",
         ),
@@ -93,22 +89,17 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
         ),
         sa.Column("final_error", sa.Text(), nullable=False),
-        sa.Column(
-            "retry_count", sa.Integer(), nullable=False, server_default=sa.text("0")
-        ),
+        sa.Column("retry_count", sa.Integer(), nullable=False, server_default=sa.text("0")),
     )
     op.create_index(
         "ix_dead_letter_events_original_event_id",
         "dead_letter_events",
         ["original_event_id"],
-        unique=True,
     )
 
 
 def downgrade() -> None:
-    op.drop_index(
-        "ix_dead_letter_events_original_event_id", table_name="dead_letter_events"
-    )
+    op.drop_index("ix_dead_letter_events_original_event_id", table_name="dead_letter_events")
     op.drop_table("dead_letter_events")
     op.drop_index("ix_webhook_events_status", table_name="webhook_events")
     op.drop_index("ix_webhook_events_idempotency_key", table_name="webhook_events")
