@@ -18,6 +18,13 @@ class AppEnv(StrEnum):
     PROD = "prod"
 
 
+class LLMProvider(StrEnum):
+    """Active LLM backend used by the worker for classification."""
+
+    ANTHROPIC = "anthropic"
+    GEMINI = "gemini"
+
+
 class LogLevel(StrEnum):
     DEBUG = "DEBUG"
     INFO = "INFO"
@@ -55,9 +62,16 @@ class Settings(BaseSettings):
     # Webhook secrets
     hubspot_webhook_secret: SecretStr | None = None
 
-    # LLM enrichment
+    # LLM enrichment.
+    # ``llm_provider`` selects the active classifier; the missing-key
+    # guard lives in :func:`webhook_ai_router.services.llm.create_llm_client`
+    # (not on this Settings model) so building ``Settings(...)`` in tests
+    # without LLM keys stays cheap and side-effect-free.
+    llm_provider: LLMProvider = LLMProvider.ANTHROPIC
     anthropic_api_key: SecretStr | None = None
     anthropic_model: str = "claude-sonnet-4-6"
+    gemini_api_key: SecretStr | None = None
+    gemini_model: str = "gemini-2.5-flash"
     llm_timeout_seconds: float = 10.0
 
     # Downstream dispatch (parsed as JSON when read from env vars)
